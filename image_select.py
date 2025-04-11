@@ -7,7 +7,7 @@ def image_select():
     if iamge_ad == str(0):
         quit()
     tar_ad = input("请输入保存路径：")
-    num = 5
+    num = 10
     image_files = os.listdir(iamge_ad)
     selected_im = []
     j = 0

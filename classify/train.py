@@ -63,7 +63,7 @@ def train(opt, device):
     # Directories
     wdir = save_dir / 'weights'
     wdir.mkdir(parents=True, exist_ok=True)  # make dir
-    last, best = wdir / 'last.pt', wdir / 'best.pt'
+    last, best = wdir / 'label.pt', wdir / 'best.pt'
 
     # Save run settings
     yaml_save(save_dir / 'opt.yaml', vars(opt))

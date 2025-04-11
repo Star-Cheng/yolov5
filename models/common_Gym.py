@@ -121,20 +121,43 @@ class eca_block(nn.Module):
         return x * y.expand_as(x)
 
 
-class SimAM(nn.Module):
-    def __init__(self, lamda=1e-5):
-        super().__init__()
-        self.lamda = lamda
-        self.sigmoid = nn.Sigmoid()
+class SE(nn.Module):
+    def __init__(self, c1, c2, ratio=16):
+        super(SE, self).__init__()
+        # c*1*1
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.l1 = nn.Linear(c1, c1 // ratio, bias=False)
+        self.relu = nn.ReLU(inplace=True)
+        self.l2 = nn.Linear(c1 // ratio, c1, bias=False)
+        self.sig = nn.Sigmoid()
 
     def forward(self, x):
-        b, c, h, w = x.shape
-        n = h * w - 1
-        mean = torch.mean(x, axis=[-2, -1], keepdim=True)
-        var = torch.sum(torch.pow((x - mean), 2), axis=[-2, -1], keepdim=True) / n
-        e_t = torch.pow((x - mean), 2) / (4 * (var + self.lamda)) + 0.5
-        out = self.sigmoid(e_t) * x
-        return out
+        b, c, _, _ = x.size()
+        y = self.avgpool(x).view(b, c)
+        y = self.l1(y)
+        y = self.relu(y)
+        y = self.l2(y)
+        y = self.sig(y)
+        y = y.view(b, c, 1, 1)
+        return x * y.expand_as(x)
+
+
+class SimAM(torch.nn.Module):
+    def __init__(self, channels=None, out_channels=None, e_lambda=1e-4):
+        super(SimAM, self).__init__()
+
+        self.activaton = nn.Sigmoid()
+        self.e_lambda = e_lambda
+
+    def forward(self, x):
+        b, c, h, w = x.size()
+
+        n = w * h - 1
+
+        x_minus_mu_square = (x - x.mean(dim=[2, 3], keepdim=True)).pow(2)
+        y = x_minus_mu_square / (4 * (x_minus_mu_square.sum(dim=[2, 3], keepdim=True) / n + self.e_lambda)) + 0.5
+
+        return x * self.activaton(y)
 
 
 class Conv_Elu(nn.Module):
@@ -273,9 +296,9 @@ class C3(nn.Module):
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
-        self.cv1 = Conv(c1, c_, 1, 1)
-        self.cv2 = Conv(c1, c_, 1, 1)
-        self.cv3 = Conv(2 * c_, c2, 1)  # optional act=FReLU(c2)
+        self.cv1 = Conv_Elu(c1, c_, 1, 1)
+        self.cv2 = Conv_Elu(c1, c_, 1, 1)
+        self.cv3 = Conv_Elu(2 * c_, c2, 1)  # optional act=FReLU(c2)
         self.m = nn.Sequential(*(Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)))
 
     def forward(self, x):
@@ -335,8 +358,8 @@ class SPPF(nn.Module):
     def __init__(self, c1, c2, k=5):  # equivalent to SPP(k=(5, 9, 13))
         super().__init__()
         c_ = c1 // 2  # hidden channels
-        self.cv1 = Conv(c1, c_, 1, 1)
-        self.cv2 = Conv(c_ * 4, c2, 1, 1)
+        self.cv1 = Conv_Elu(c1, c_, 1, 1)
+        self.cv2 = Conv_Elu(c_ * 4, c2, 1, 1)
         self.m = nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
 
     def forward(self, x):

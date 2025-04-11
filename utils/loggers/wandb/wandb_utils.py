@@ -97,7 +97,7 @@ class WandbLogger():
         if isinstance(opt.resume, str):
             model_dir, _ = self.download_model_artifact(opt)
             if model_dir:
-                self.weights = Path(model_dir) / 'last.pt'
+                self.weights = Path(model_dir) / 'label.pt'
                 config = self.wandb_run.config
                 opt.weights, opt.save_period, opt.batch_size, opt.bbox_interval, opt.epochs, opt.hyp, opt.imgsz = str(
                     self.weights), config.save_period, config.batch_size, config.bbox_interval, config.epochs, \
@@ -128,7 +128,7 @@ class WandbLogger():
                                             'project': opt.project,
                                             'total_epochs': opt.epochs,
                                             'fitness_score': fitness_score})
-        model_artifact.add_file(str(path / 'last.pt'), name='last.pt')
+        model_artifact.add_file(str(path / 'label.pt'), name='label.pt')
         wandb.log_artifact(model_artifact,
                            aliases=['latest', 'last', 'epoch ' + str(self.current_epoch), 'best' if best_model else ''])
         LOGGER.info(f'Saving model artifact on epoch {epoch + 1}')
